@@ -9,6 +9,21 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { BookingForm } from './BookingForm';
 
+// Esta página SIEMPRE tiene que pegarle a Supabase en cada visita: los
+// slots ocupados cambian todo el tiempo (reservas, confirmaciones,
+// cancelaciones) y mostrar una versión vieja significa dejar que un
+// cliente intente reservar un horario que ya no está libre.
+//
+// En local (`next dev`) esto nunca se nota: el modo dev no pre-renderiza
+// ni cachea rutas, así que SIEMPRE pega a la base — el problema solo
+// aparece en producción (`next build` / Vercel), que si no se le dice
+// lo contrario puede optimizar esta página como estática. Con
+// createClient() (que usa cookies()) ya debería alcanzar para que
+// Next.js la trate como dinámica, pero lo hacemos explícito para no
+// depender de esa inferencia.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function ReservarPage({
   params,
 }: {

@@ -42,9 +42,8 @@ function buildConfirmationMessage(appt: ConfirmationDetails): string {
 }
 
 // ---------------------------------------------------------------------
-// Confirmar: la única acción que además dispara el WhatsApp, ahora vía
-// la cola confiable (sendOrQueueWhatsAppMessage) en vez del envío
-// directo de antes.
+// Confirmar: dispara el WhatsApp de confirmación vía la cola confiable
+// (sendOrQueueWhatsAppMessage). Sin cambios en esta entrega.
 // ---------------------------------------------------------------------
 export async function confirmAppointment(rangeId: string, appointmentId: string) {
   const supabase = await createClient();
@@ -92,10 +91,66 @@ export async function confirmAppointment(rangeId: string, appointmentId: string)
 }
 
 // ---------------------------------------------------------------------
-// Cancelar / en curso / atendido: mismo patrón simple (solo cambian
-// status), así que comparten esta única implementación.
+// Cancelar (admin): a diferencia de in_progress/completed, esta acción
+// ahora necesita leer los datos del cliente para armar el WhatsApp, así
+// que dejó de compartir setSimpleStatus — mismo patrón que
+// confirmAppointment (update + select en una sola llamada).
 // ---------------------------------------------------------------------
-type SimpleStatus = Exclude<AppointmentStatus, 'pending' | 'confirmed'>;
+type AdminCancellationDetails = Pick<
+  AppointmentRow,
+  'client_first_name' | 'client_phone' | 'appointment_date' | 'appointment_time'
+>;
+
+function buildAdminCancellationMessage(appt: AdminCancellationDetails): string {
+  return `Hola ${appt.client_first_name}, debido a un inconveniente se canceló tu turno del ${formatLong(
+    appt.appointment_date
+  )} a las ${normalizeTime(appt.appointment_time)} hs. Lamentamos las molestias.`;
+}
+
+export async function cancelAppointment(rangeId: string, appointmentId: string) {
+  const supabase = await createClient();
+
+  const { data: appt, error } = await supabase
+    .from('appointments')
+    .update({ status: 'cancelled' })
+    .eq('id', appointmentId)
+    .select('client_first_name, client_phone, appointment_date, appointment_time')
+    .single<AdminCancellationDetails>();
+
+  if (error || !appt) {
+    console.error('Error al cancelar appointment:', error);
+    redirect(
+      `/admin/turnos/${rangeId}?error=${encodeURIComponent(
+        'No se pudo cancelar el turno. Probá de nuevo.'
+      )}`
+    );
+  }
+
+  // Mismo criterio que al confirmar: el turno YA está cancelado acá.
+  // Si Evolution falla, sendOrQueueWhatsAppMessage lo encola solo — no
+  // revertimos la cancelación por esto. Esto no toca en nada el flujo
+  // de cancelación por token del cliente, que vive en
+  // src/app/cancelar/[token]/actions.ts y sigue igual.
+  await sendOrQueueWhatsAppMessage({
+    appointmentId,
+    phone: appt.client_phone,
+    message: buildAdminCancellationMessage(appt),
+    type: 'cancellation',
+  });
+
+  revalidatePath(`/admin/turnos/${rangeId}`);
+  revalidatePath('/admin/turnos');
+
+  redirect(
+    `/admin/turnos/${rangeId}?success=${encodeURIComponent('Turno cancelado.')}`
+  );
+}
+
+// ---------------------------------------------------------------------
+// En curso / atendido: no mandan WhatsApp, solo cambian status, así
+// que siguen compartiendo esta única implementación simple.
+// ---------------------------------------------------------------------
+type SimpleStatus = Extract<AppointmentStatus, 'in_progress' | 'completed'>;
 
 async function setSimpleStatus(
   rangeId: string,
@@ -125,10 +180,6 @@ async function setSimpleStatus(
   redirect(
     `/admin/turnos/${rangeId}?success=${encodeURIComponent(successMessage)}`
   );
-}
-
-export async function cancelAppointment(rangeId: string, appointmentId: string) {
-  await setSimpleStatus(rangeId, appointmentId, 'cancelled', 'Turno cancelado.');
 }
 
 export async function markInProgress(rangeId: string, appointmentId: string) {
