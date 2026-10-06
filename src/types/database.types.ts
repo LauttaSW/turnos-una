@@ -21,6 +21,7 @@ export interface ProfileRow {
   id: string;
   full_name: string | null;
   role: 'admin';
+  admin_view: 'desktop' | 'mobile';
   created_at: string;
 }
 

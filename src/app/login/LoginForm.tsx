@@ -19,7 +19,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       return;
     }
 
-    window.location.assign(result.destination ?? '/admin/turnos');
+    window.location.assign(result.destination ?? '/admin');
   }
 
   return (

@@ -24,7 +24,7 @@ export async function login(formData: FormData): Promise<{ error?: string; desti
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, admin_view')
     .eq('id', data.user.id)
     .single();
 
@@ -33,6 +33,10 @@ export async function login(formData: FormData): Promise<{ error?: string; desti
     return { error: 'Esta cuenta no tiene permisos de administrador' };
   }
 
-  const destination = redirectTo?.startsWith('/admin') ? redirectTo : '/admin/turnos';
+  const destination = redirectTo?.startsWith('/admin')
+    ? redirectTo
+    : profile.admin_view === 'mobile'
+      ? '/admin/movil'
+      : '/admin/turnos';
   return { destination };
 }

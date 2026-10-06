@@ -62,9 +62,12 @@ export default async function ReservarPage({
 
   return (
     <main className={`${fontSans.className} min-h-screen bg-[#FAF6F1]`}>
-      <div className="mx-auto max-w-2xl px-5 py-10 sm:px-8 sm:py-14">
-        <header>
-          <h1 className={`${fontDisplay.className} text-3xl text-[#2B2320]`}>
+      <div className="mx-auto min-h-screen max-w-2xl px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-8 sm:py-14">
+        <header className="rounded-2xl border border-[#E8DED7] bg-white px-5 py-5 shadow-sm sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:shadow-none">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9B3B54]">
+            Reservá tu turno
+          </p>
+          <h1 className={`${fontDisplay.className} mt-1 text-2xl leading-tight text-[#2B2320] sm:text-3xl`}>
             {range.title}
           </h1>
           <p className="mt-2 text-sm text-[#8A7D77]">
@@ -72,7 +75,7 @@ export default async function ReservarPage({
           </p>
         </header>
 
-        <div className="mt-8">
+        <div className="mt-5 sm:mt-8">
           {closed ? (
             <div className="rounded-lg border border-[#E2D6CF] bg-white px-6 py-10 text-center">
               <p className={`${fontDisplay.className} text-lg text-[#2B2320]`}>
