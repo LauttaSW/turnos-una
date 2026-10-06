@@ -200,6 +200,48 @@ export async function markCompleted(rangeId: string, appointmentId: string) {
   );
 }
 
+export async function retryFailedWhatsAppMessage(
+  rangeId: string,
+  outboxId: string
+): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect('/login');
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError || profile?.role !== 'admin') redirect('/login');
+
+  const { error } = await supabase.rpc(
+    'admin_retry_failed_whatsapp_message',
+    { p_outbox_id: outboxId, p_date_range_id: rangeId }
+  );
+
+  if (error) {
+    console.error('Error al reencolar el mensaje de WhatsApp:', error);
+    redirect(
+      `/admin/turnos/${rangeId}?error=${encodeURIComponent(
+        'No se pudo reactivar el mensaje. Actualizá la tarjeta e intentá de nuevo.'
+      )}`
+    );
+  }
+
+  revalidatePath(`/admin/turnos/${rangeId}`);
+  revalidatePath('/admin/turnos');
+  redirect(
+    `/admin/turnos/${rangeId}?success=${encodeURIComponent(
+      'Mensaje reencolado y número habilitado. Se volverá a intentar en breve.'
+    )}`
+  );
+}
+
 export async function updateAppointmentClient(
   rangeId: string,
   appointmentId: string,

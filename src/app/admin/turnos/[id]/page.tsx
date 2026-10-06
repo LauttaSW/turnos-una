@@ -3,7 +3,14 @@ import { notFound } from 'next/navigation';
 import { fontDisplay } from '@/lib/fonts';
 import { formatLong, normalizeTime } from '@/lib/dates';
 import { createClient } from '@/lib/supabase/server';
-import type { AppointmentRow, AppointmentStatus } from '@/types/database.types';
+import { createServiceClient } from '@/lib/supabase/service';
+import type {
+  AppointmentRow,
+  AppointmentStatus,
+  WhatsappOutboxRow,
+  WhatsappOutboxType,
+} from '@/types/database.types';
+import { RetryWhatsAppButton } from './RetryWhatsAppButton';
 import {
   cancelAppointment,
   confirmAppointment,
@@ -53,6 +60,12 @@ function sortAppointments(appointments: AppointmentRow[]): AppointmentRow[] {
   });
 }
 
+function isRetryableMessageType(
+  type: WhatsappOutboxType | null
+): type is Extract<WhatsappOutboxType, 'confirmation' | 'cancellation'> {
+  return type === 'confirmation' || type === 'cancellation';
+}
+
 export default async function TurnosDelRangoPage({
   params,
   searchParams,
@@ -83,6 +96,68 @@ export default async function TurnosDelRangoPage({
     .order('appointment_time', { ascending: true });
 
   const appointments = sortAppointments(appointmentsData ?? []);
+  const failedMessagesByAppointment = new Map<
+    string,
+    Array<WhatsappOutboxRow & { type: Extract<WhatsappOutboxType, 'confirmation' | 'cancellation'> }>
+  >();
+  let whatsappRetryUnavailable = false;
+
+  const activeAppointmentIds = appointments
+    .filter((appointment) =>
+      [
+        'confirmed',
+        'in_progress',
+        'completed',
+        'cancelled',
+        'cancelled_by_client',
+      ].includes(appointment.status)
+    )
+    .map((appointment) => appointment.id);
+
+  if (activeAppointmentIds.length > 0) {
+    try {
+      const serviceClient = createServiceClient();
+      const { data: failedMessages, error: failedMessagesError } = await serviceClient
+        .from('whatsapp_outbox')
+        .select('*')
+        .in('appointment_id', activeAppointmentIds)
+        .in('type', ['confirmation', 'cancellation'])
+        .eq('status', 'failed')
+        .is('resolved_at', null)
+        .order('created_at', { ascending: false });
+
+      if (failedMessagesError) {
+        whatsappRetryUnavailable = true;
+        console.warn('No se pudieron cargar los fallos de WhatsApp:', failedMessagesError.message);
+      } else {
+        const appointmentStatusById = new Map(
+          appointments.map((appointment) => [appointment.id, appointment.status])
+        );
+
+        for (const message of failedMessages ?? []) {
+          if (!message.appointment_id || !isRetryableMessageType(message.type)) continue;
+
+          const appointmentStatus = appointmentStatusById.get(message.appointment_id);
+          const canRetry =
+            (message.type === 'confirmation' &&
+              ['confirmed', 'in_progress', 'completed'].includes(appointmentStatus ?? '')) ||
+            (message.type === 'cancellation' &&
+              ['cancelled', 'cancelled_by_client'].includes(appointmentStatus ?? ''));
+          if (!canRetry) continue;
+
+          const existing = failedMessagesByAppointment.get(message.appointment_id) ?? [];
+          existing.push({ ...message, type: message.type });
+          failedMessagesByAppointment.set(message.appointment_id, existing);
+        }
+      }
+    } catch (error) {
+      whatsappRetryUnavailable = true;
+      console.warn(
+        'No se pudo consultar la cola de WhatsApp:',
+        error instanceof Error ? error.message : error
+      );
+    }
+  }
 
   return (
     <div className="max-w-4xl">
@@ -116,6 +191,14 @@ export default async function TurnosDelRangoPage({
           {success}
         </p>
       )}
+      {whatsappRetryUnavailable && (
+        <p
+          role="status"
+          className="mt-4 rounded-md border border-[#E7D7A8] bg-[#FFF8E5] px-4 py-3 text-sm text-[#765D1B]"
+        >
+          No se pudo consultar la cola de WhatsApp. Configurá la clave secreta de Supabase en el servidor para habilitar los reintentos.
+        </p>
+      )}
 
       {appointments.length === 0 ? (
         <p className="mt-8 rounded-lg border border-dashed border-[#E2D6CF] px-6 py-10 text-center text-sm text-[#8A7D77]">
@@ -124,6 +207,7 @@ export default async function TurnosDelRangoPage({
       ) : (
         <ul className="mt-6 space-y-3">
           {appointments.map((appt) => {
+            const failedMessages = failedMessagesByAppointment.get(appt.id) ?? [];
             const canCancel =
               appt.status === 'pending' ||
               appt.status === 'confirmed' ||
@@ -132,6 +216,7 @@ export default async function TurnosDelRangoPage({
             return (
               <li
                 key={appt.id}
+                id={`appointment-${appt.id}`}
                 className="rounded-lg border border-[#E8DED7] bg-white p-5"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -154,6 +239,28 @@ export default async function TurnosDelRangoPage({
                     <p className="mt-1 text-sm text-[#8A7D77]">
                       {appt.client_phone}
                     </p>
+                    {failedMessages.map((failedMessage) => (
+                      <div key={failedMessage.id} className="mt-3 space-y-2 rounded-xl border border-[#E3B3B3] bg-[#FBEAEA] p-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[#8C3B3B]">
+                            No se pudo enviar el mensaje de {failedMessage.type === 'cancellation' ? 'cancelación' : 'confirmación'}
+                          </p>
+                          <p className="mt-1 text-xs text-[#8C3B3B]">
+                            El mensaje quedó fallido. Al reintentar se habilitará este número y se reiniciará el contador.
+                          </p>
+                          {failedMessage.last_error && (
+                            <p className="mt-2 break-words text-xs text-[#8C3B3B]/80">
+                              {failedMessage.last_error.slice(0, 180)}
+                            </p>
+                          )}
+                        </div>
+                        <RetryWhatsAppButton
+                          rangeId={range.id}
+                          outboxId={failedMessage.id}
+                          messageType={failedMessage.type}
+                        />
+                      </div>
+                    ))}
                     {appt.notes && (
                       <p className="mt-2 text-sm italic text-[#8A7D77]">
                         “{appt.notes}”

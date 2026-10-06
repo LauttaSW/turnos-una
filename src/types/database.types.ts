@@ -217,6 +217,14 @@ export interface Database {
         Args: Record<string, never>;
         Returns: boolean;
       };
+      admin_retry_failed_whatsapp_confirmation: {
+        Args: { p_outbox_id: string; p_date_range_id: string };
+        Returns: boolean;
+      };
+      admin_retry_failed_whatsapp_message: {
+        Args: { p_outbox_id: string; p_date_range_id: string };
+        Returns: boolean;
+      };
       get_appointment_by_cancel_token: {
         Args: { p_token: string };
         Returns: {

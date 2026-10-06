@@ -2,7 +2,11 @@ import Link from 'next/link';
 import { fontDisplay } from '@/lib/fonts';
 import { formatLong, normalizeTime, todayIso } from '@/lib/dates';
 import { createClient } from '@/lib/supabase/server';
-import type { AppointmentRow } from '@/types/database.types';
+import { createServiceClient } from '@/lib/supabase/service';
+import type {
+  AppointmentRow,
+  WhatsappOutboxRow,
+} from '@/types/database.types';
 
 const ACTIVE_STATUSES = ['pending', 'confirmed', 'in_progress'] as const;
 
@@ -35,7 +39,63 @@ export default async function AdminMobileHomePage() {
 
   const pendingAppointments: AppointmentRow[] = pendingData ?? [];
   const upcomingAppointments: AppointmentRow[] = upcomingData ?? [];
-  const rangeIds = [...new Set([...pendingAppointments, ...upcomingAppointments].map((appointment) => appointment.date_range_id))];
+
+  let failedMessages: WhatsappOutboxRow[] = [];
+  let failedMessageLookupUnavailable = false;
+  try {
+    const serviceClient = createServiceClient();
+    const { data, error } = await serviceClient
+      .from('whatsapp_outbox')
+      .select('*')
+      .in('type', ['confirmation', 'cancellation'])
+      .eq('status', 'failed')
+      .is('resolved_at', null)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (error) {
+      failedMessageLookupUnavailable = true;
+      console.warn('No se pudieron consultar los mensajes fallidos:', error.message);
+    } else {
+      failedMessages = data ?? [];
+    }
+  } catch (error) {
+    failedMessageLookupUnavailable = true;
+    console.warn(
+      'No se pudo consultar la cola de WhatsApp:',
+      error instanceof Error ? error.message : error
+    );
+  }
+
+  const failedAppointmentIds = [...new Set(
+    failedMessages
+      .map((message) => message.appointment_id)
+      .filter((id): id is string => Boolean(id))
+  )];
+  const { data: failedAppointmentsData } = failedAppointmentIds.length
+    ? await supabase.from('appointments').select('*').in('id', failedAppointmentIds)
+    : { data: [] };
+  const failedAppointments = new Map(
+    (failedAppointmentsData ?? []).map((appointment) => [appointment.id, appointment as AppointmentRow])
+  );
+  const retryableFailedMessages = failedMessages.filter((message) => {
+    if (!message.appointment_id) return false;
+    const appointment = failedAppointments.get(message.appointment_id);
+    if (!appointment) return false;
+    if (message.type === 'confirmation') {
+      return ['confirmed', 'in_progress', 'completed'].includes(appointment.status);
+    }
+    if (message.type === 'cancellation') {
+      return ['cancelled', 'cancelled_by_client'].includes(appointment.status);
+    }
+    return false;
+  });
+
+  const rangeIds = [...new Set([
+    ...pendingAppointments,
+    ...upcomingAppointments,
+    ...(failedAppointmentsData ?? []),
+  ].map((appointment) => appointment.date_range_id))];
   const { data: ranges } = rangeIds.length
     ? await supabase.from('date_ranges').select('id, title').in('id', rangeIds)
     : { data: [] };
@@ -62,6 +122,41 @@ export default async function AdminMobileHomePage() {
     );
   }
 
+  function failedMessageCard(message: WhatsappOutboxRow) {
+    if (!message.appointment_id) return null;
+    const appointment = failedAppointments.get(message.appointment_id);
+    if (!appointment) return null;
+    const isCancellation = message.type === 'cancellation';
+    const rangeTitle = titleByRangeId.get(appointment.date_range_id) ?? 'Turnos';
+
+    return (
+      <li key={`failed-${message.id}`}>
+        <Link
+          href={`/admin/turnos/${appointment.date_range_id}#appointment-${appointment.id}`}
+          className="block rounded-2xl border border-[#E3B3B3] bg-[#FBEAEA] p-4 shadow-sm transition active:scale-[0.99] hover:border-[#C77F8F]"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-[#542B32]">
+                {appointment.client_first_name} {appointment.client_last_name}
+              </p>
+              <p className="mt-1 text-sm text-[#713B45]">
+                {formatLong(appointment.appointment_date)} · {normalizeTime(appointment.appointment_time)}
+              </p>
+              <p className="mt-1 truncate text-xs text-[#8C3B3B]">{rangeTitle}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#8C3B3B]">
+              WhatsApp fallido
+            </span>
+          </div>
+          <p className="mt-3 text-sm font-medium text-[#8C3B3B]">
+            Falló el mensaje de {isCancellation ? 'cancelación' : 'confirmación'} · Reintentar →
+          </p>
+        </Link>
+      </li>
+    );
+  }
+
   return (
     <div className="space-y-7">
       <section>
@@ -78,8 +173,16 @@ export default async function AdminMobileHomePage() {
           </div>
           <Link href="/admin/turnos" className="min-h-11 shrink-0 rounded-xl px-3 py-2 text-sm font-medium text-[#8B344B] hover:bg-[#F3E4E8]">Ver todas</Link>
         </div>
-        {pendingAppointments.length ? (
-          <ul className="space-y-3">{pendingAppointments.map(appointmentCard)}</ul>
+        {failedMessageLookupUnavailable && (
+          <p className="mb-3 rounded-xl border border-[#E7D7A8] bg-[#FFF8E5] px-4 py-3 text-sm text-[#765D1B]">
+            No se pudieron consultar los avisos de WhatsApp. Revisá la clave secreta de Supabase en el servidor.
+          </p>
+        )}
+        {retryableFailedMessages.length > 0 || pendingAppointments.length > 0 ? (
+          <ul className="space-y-3">
+            {retryableFailedMessages.map(failedMessageCard)}
+            {pendingAppointments.map(appointmentCard)}
+          </ul>
         ) : (
           <p className="rounded-2xl border border-dashed border-[#E2D6CF] bg-white/60 px-4 py-6 text-center text-sm text-[#8A7D77]">No hay solicitudes pendientes.</p>
         )}

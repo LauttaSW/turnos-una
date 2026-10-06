@@ -3,17 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { AdminTimedNotice } from './AdminTimedNotice';
 
 type NotificationsResponse = {
   pendingCount: number;
   recentCancellationsCount: number;
-  failedConfirmationCount: number;
+  failedWhatsAppMessageCount: number;
 };
 
 type Props = {
   initialPendingCount: number;
   initialRecentCancellationsCount: number;
-  initialFailedConfirmationCount: number;
+  initialFailedWhatsAppMessageCount: number;
 };
 
 const ITEMS = [
@@ -25,13 +26,13 @@ const ITEMS = [
 export function AdminMobileNav({
   initialPendingCount,
   initialRecentCancellationsCount,
-  initialFailedConfirmationCount,
+  initialFailedWhatsAppMessageCount,
 }: Props) {
   const pathname = usePathname();
   const [notifications, setNotifications] = useState<NotificationsResponse>({
     pendingCount: initialPendingCount,
     recentCancellationsCount: initialRecentCancellationsCount,
-    failedConfirmationCount: initialFailedConfirmationCount,
+    failedWhatsAppMessageCount: initialFailedWhatsAppMessageCount,
   });
 
   useEffect(() => {
@@ -55,17 +56,17 @@ export function AdminMobileNav({
 
   return (
     <>
-      {(notifications.failedConfirmationCount > 0 || notifications.recentCancellationsCount > 0) && (
+      {(notifications.failedWhatsAppMessageCount > 0 || notifications.recentCancellationsCount > 0) && (
         <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-2xl flex-col gap-2 px-3">
-          {notifications.failedConfirmationCount > 0 && (
-            <Link href="/admin/turnos" role="alert" className="rounded-xl border border-[#E3B3B3] bg-[#FBEAEA] px-4 py-3 text-sm font-medium text-[#8C3B3B] shadow-lg">
-              No se logró enviar la confirmación del turno{notifications.failedConfirmationCount > 1 ? ` (${notifications.failedConfirmationCount})` : ''}
-            </Link>
+          {notifications.failedWhatsAppMessageCount > 0 && (
+            <AdminTimedNotice notificationKey={`failed-${notifications.failedWhatsAppMessageCount}`} href="/admin/movil" role="alert" className="rounded-xl border border-[#E3B3B3] bg-[#FBEAEA] px-4 py-3 text-sm font-medium text-[#8C3B3B] shadow-lg">
+              Hay mensajes de WhatsApp que no se pudieron enviar{notifications.failedWhatsAppMessageCount > 1 ? ` (${notifications.failedWhatsAppMessageCount})` : ''}
+            </AdminTimedNotice>
           )}
           {notifications.recentCancellationsCount > 0 && (
-            <Link href="/admin/turnos" role="status" className="rounded-xl border border-[#E8DED7] bg-white px-4 py-3 text-sm text-[#4A423E] shadow-lg">
+            <AdminTimedNotice notificationKey={`cancellations-${notifications.recentCancellationsCount}`} href="/admin/turnos" role="status" className="rounded-xl border border-[#E8DED7] bg-white px-4 py-3 text-sm text-[#4A423E] shadow-lg">
               {notifications.recentCancellationsCount} cancelación{notifications.recentCancellationsCount === 1 ? '' : 'es'} reciente{notifications.recentCancellationsCount === 1 ? '' : 's'}
-            </Link>
+            </AdminTimedNotice>
           )}
         </div>
       )}

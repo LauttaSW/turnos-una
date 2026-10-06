@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { fontDisplay, fontSans } from '@/lib/fonts';
 import {
   getPendingAppointmentsCount,
-  getFailedConfirmationCount,
+  getFailedWhatsAppMessageCount,
   getRecentCancellationsCount,
 } from '@/lib/appointments';
 import { logout } from './actions';
@@ -26,10 +26,10 @@ export default async function AdminLayout({
   // Valores iniciales para el primer render (sin esto, el sidebar
   // arrancaría siempre en 0 hasta el primer poll). AdminSidebarNav
   // toma la posta desde acá.
-  const [pendingCount, recentCancellationsCount, failedConfirmationCount] = await Promise.all([
+  const [pendingCount, recentCancellationsCount, failedWhatsAppMessageCount] = await Promise.all([
     getPendingAppointmentsCount(),
     getRecentCancellationsCount(),
-    getFailedConfirmationCount(),
+    getFailedWhatsAppMessageCount(),
   ]);
 
   if (profile?.admin_view === 'mobile') {
@@ -51,7 +51,7 @@ export default async function AdminLayout({
         <AdminMobileNav
           initialPendingCount={pendingCount}
           initialRecentCancellationsCount={recentCancellationsCount}
-          initialFailedConfirmationCount={failedConfirmationCount}
+          initialFailedWhatsAppMessageCount={failedWhatsAppMessageCount}
         />
       </div>
     );
@@ -70,7 +70,7 @@ export default async function AdminLayout({
         <AdminSidebarNav
           initialPendingCount={pendingCount}
           initialRecentCancellationsCount={recentCancellationsCount}
-          initialFailedConfirmationCount={failedConfirmationCount}
+          initialFailedWhatsAppMessageCount={failedWhatsAppMessageCount}
         />
 
         <form action={logout} className="mt-5 md:mt-auto">

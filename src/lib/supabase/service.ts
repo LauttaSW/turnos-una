@@ -10,10 +10,13 @@ import type { Database } from '@/types/database.types';
  */
 export function createServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey =
+    process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceRoleKey) {
-    throw new Error('Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor.');
+    throw new Error(
+      'Falta configurar SUPABASE_SECRET_KEY (recomendado) o SUPABASE_SERVICE_ROLE_KEY en el servidor.'
+    );
   }
 
   return createSupabaseClient<Database>(url, serviceRoleKey, {

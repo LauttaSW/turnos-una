@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { AdminTimedNotice } from './AdminTimedNotice';
 
 const NAV_ITEMS = [
+  { href: '/admin/solicitudes', label: 'Solicitudes por revisar' },
   { href: '/admin/calendario', label: 'Calendario de turnos' },
   { href: '/admin/turnos', label: 'Turnos' },
 ] as const;
@@ -14,13 +16,13 @@ const POLL_INTERVAL_MS = 25_000;
 type NotificationsResponse = {
   pendingCount: number;
   recentCancellationsCount: number;
-  failedConfirmationCount: number;
+  failedWhatsAppMessageCount: number;
 };
 
 type Props = {
   initialPendingCount: number;
   initialRecentCancellationsCount: number;
-  initialFailedConfirmationCount: number;
+  initialFailedWhatsAppMessageCount: number;
 };
 
 /**
@@ -36,14 +38,14 @@ type Props = {
 export function AdminSidebarNav({
   initialPendingCount,
   initialRecentCancellationsCount,
-  initialFailedConfirmationCount,
+  initialFailedWhatsAppMessageCount,
 }: Props) {
   const [pendingCount, setPendingCount] = useState(initialPendingCount);
   const [recentCancellationsCount, setRecentCancellationsCount] = useState(
     initialRecentCancellationsCount
   );
-  const [failedConfirmationCount, setFailedConfirmationCount] = useState(
-    initialFailedConfirmationCount
+  const [failedWhatsAppMessageCount, setFailedWhatsAppMessageCount] = useState(
+    initialFailedWhatsAppMessageCount
   );
 
   useEffect(() => {
@@ -62,7 +64,7 @@ export function AdminSidebarNav({
         if (!cancelled) {
           setPendingCount(data.pendingCount);
           setRecentCancellationsCount(data.recentCancellationsCount);
-          setFailedConfirmationCount(data.failedConfirmationCount);
+          setFailedWhatsAppMessageCount(data.failedWhatsAppMessageCount);
         }
       } catch (error) {
         // Un polling de fondo que falla una vez no amerita mostrarle
@@ -90,7 +92,8 @@ export function AdminSidebarNav({
   return (
     <>
       {recentCancellationsCount > 0 && (
-        <div
+        <AdminTimedNotice
+          notificationKey={`cancellations-${recentCancellationsCount}`}
           role="status"
           className="mt-4 rounded-md bg-[#FBEAEA] px-3 py-2 text-xs font-medium text-[#8C3B3B]"
         >
@@ -99,23 +102,26 @@ export function AdminSidebarNav({
             ? 'cancelación reciente'
             : 'cancelaciones recientes'}{' '}
           (última hora)
-        </div>
+        </AdminTimedNotice>
       )}
 
-      {failedConfirmationCount > 0 && (
-        <Link
-          href="/admin/turnos"
+      {failedWhatsAppMessageCount > 0 && (
+        <AdminTimedNotice
+          notificationKey={`failed-${failedWhatsAppMessageCount}`}
+          href="/admin/solicitudes"
           role="alert"
           className="mt-3 block rounded-md border border-[#E3B3B3] bg-[#FBEAEA] px-3 py-2 text-xs font-medium text-[#8C3B3B] hover:bg-[#F6DEDE]"
         >
-          No se logró enviar la confirmación del turno
-          {failedConfirmationCount > 1 ? ` (${failedConfirmationCount})` : ''}
-        </Link>
+          Hay mensajes de WhatsApp que no se pudieron enviar
+          {failedWhatsAppMessageCount > 1 ? ` (${failedWhatsAppMessageCount})` : ''}
+        </AdminTimedNotice>
       )}
 
       <nav className="mt-5 flex gap-1 overflow-x-auto md:mt-8 md:flex-1 md:flex-col md:gap-1.5 md:overflow-visible">
         {NAV_ITEMS.map((item) => {
-          const badge = item.href === '/admin/turnos' ? pendingCount : 0;
+          const badge = item.href === '/admin/solicitudes'
+            ? pendingCount + failedWhatsAppMessageCount
+            : item.href === '/admin/turnos' ? pendingCount : 0;
 
           return (
             <Link

@@ -12,14 +12,20 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     setError(null);
     setIsSubmitting(true);
 
-    const result = await login(new FormData(event.currentTarget));
-    if (result.error) {
-      setError(result.error);
-      setIsSubmitting(false);
-      return;
-    }
+    try {
+      const result = await login(new FormData(event.currentTarget));
+      if (result.error) {
+        setError(result.error);
+        setIsSubmitting(false);
+        return;
+      }
 
-    window.location.assign(result.destination ?? '/admin');
+      window.location.assign(result.destination ?? '/admin');
+    } catch (loginError) {
+      console.error('No se pudo completar el inicio de sesión:', loginError);
+      setError('No se pudo iniciar sesión. Revisá tu conexión e intentá de nuevo.');
+      setIsSubmitting(false);
+    }
   }
 
   return (

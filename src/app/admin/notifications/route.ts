@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   getPendingAppointmentsCount,
-  getFailedConfirmationCount,
+  getFailedWhatsAppMessageCount,
   getRecentCancellationsCount,
 } from '@/lib/appointments';
 import { flushWhatsAppOutbox } from '@/lib/whatsapp-outbox';
@@ -20,18 +20,18 @@ export const dynamic = 'force-dynamic';
 // no necesita ningún cambio — solo lee pendingCount y
 // recentCancellationsCount, y ese campo extra lo ignora.
 export async function GET() {
-  const [pendingCount, recentCancellationsCount, failedConfirmationCount, outboxResult] =
+  const [pendingCount, recentCancellationsCount, failedWhatsAppMessageCount, outboxResult] =
     await Promise.all([
       getPendingAppointmentsCount(),
       getRecentCancellationsCount(),
-      getFailedConfirmationCount(),
+      getFailedWhatsAppMessageCount(),
       flushWhatsAppOutbox(),
     ]);
 
   return NextResponse.json({
     pendingCount,
     recentCancellationsCount,
-    failedConfirmationCount,
+    failedWhatsAppMessageCount,
     whatsappOutbox: outboxResult,
   });
 }

@@ -22,21 +22,26 @@ export async function login(formData: FormData): Promise<{ error?: string; desti
     return { error: 'Email o contraseña incorrectos' };
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role, admin_view')
     .eq('id', data.user.id)
-    .single();
+    .maybeSingle();
 
-  if (profile?.role !== 'admin') {
+  if (profileError || profile?.role !== 'admin') {
     await supabase.auth.signOut();
     return { error: 'Esta cuenta no tiene permisos de administrador' };
   }
 
-  const destination = redirectTo?.startsWith('/admin')
-    ? redirectTo
-    : profile.admin_view === 'mobile'
-      ? '/admin/movil'
-      : '/admin/turnos';
+  // /admin/login no es una sección del panel; puede llegar aquí como
+  // redirectTo si alguien intentó abrir una ruta de login bajo /admin.
+  const isValidAdminDestination =
+    (redirectTo === '/admin' || redirectTo?.startsWith('/admin/')) &&
+    !redirectTo?.startsWith('/admin/login');
+  const defaultDestination =
+    profile.admin_view === 'mobile' ? '/admin/movil' : '/admin/turnos';
+  const destination = isValidAdminDestination
+    ? redirectTo ?? defaultDestination
+    : defaultDestination;
   return { destination };
 }
