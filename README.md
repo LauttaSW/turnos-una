@@ -2,6 +2,13 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### Variables de entorno del servidor
+
+El envío y la cola de WhatsApp usan un cliente Supabase privilegiado
+exclusivamente en el servidor. Configurá `SUPABASE_SERVICE_ROLE_KEY` en el
+entorno local y en Coolify junto con las variables públicas de Supabase. No
+uses el prefijo `NEXT_PUBLIC_` para esta clave y nunca la expongas al navegador.
+
 First, run the development server:
 
 ```bash

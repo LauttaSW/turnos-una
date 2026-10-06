@@ -48,3 +48,21 @@ export async function getRecentCancellationsCount(
 
   return count ?? 0;
 }
+
+export async function getFailedConfirmationCount(): Promise<number> {
+  const supabase = await createClient();
+
+  const { count, error } = await supabase
+    .from('whatsapp_outbox')
+    .select('id', { count: 'exact', head: true })
+    .eq('type', 'confirmation')
+    .eq('status', 'failed')
+    .is('resolved_at', null);
+
+  if (error) {
+    console.error('Error al contar confirmaciones de WhatsApp fallidas:', error);
+    return 0;
+  }
+
+  return count ?? 0;
+}

@@ -17,6 +17,7 @@ export type AppointmentStatus =
 // ---------------------------------------------------------------------
 
 export interface ProfileRow {
+  [key: string]: unknown;
   id: string;
   full_name: string | null;
   role: 'admin';
@@ -24,6 +25,7 @@ export interface ProfileRow {
 }
 
 export interface DateRangeRow {
+  [key: string]: unknown;
   id: string;
   title: string;
   start_date: string; // formato 'YYYY-MM-DD'
@@ -36,6 +38,7 @@ export interface DateRangeRow {
 }
 
 export interface DateRangeInsert {
+  [key: string]: unknown;
   title: string;
   start_date: string;
   end_date: string;
@@ -45,6 +48,7 @@ export interface DateRangeInsert {
 }
 
 export interface DateRangeUpdate {
+  [key: string]: unknown;
   title?: string;
   start_date?: string;
   end_date?: string;
@@ -53,6 +57,7 @@ export interface DateRangeUpdate {
 }
 
 export interface AppointmentRow {
+  [key: string]: unknown;
   id: string;
   date_range_id: string;
   appointment_date: string; // 'YYYY-MM-DD'
@@ -76,6 +81,7 @@ export interface AppointmentRow {
 // status no se incluye: el default de la DB es 'pending' y la RLS
 // exige que sea 'pending', así que ni conviene mandarlo desde el cliente.
 export interface AppointmentInsert {
+  [key: string]: unknown;
   date_range_id: string;
   appointment_date: string;
   appointment_time: string;
@@ -87,6 +93,7 @@ export interface AppointmentInsert {
 
 // Lo que puede tocar un admin (confirmar/cancelar/editar notas, etc.)
 export interface AppointmentUpdate {
+  [key: string]: unknown;
   status?: AppointmentStatus;
   notes?: string | null;
   client_first_name?: string;
@@ -99,6 +106,7 @@ export interface AppointmentUpdate {
 // 'cancelled' (es lo único que libera un horario), así que cualquier
 // otro estado cuenta como "ocupado".
 export interface AppointmentSlotPublicRow {
+  [key: string]: unknown;
   id: string;
   date_range_id: string;
   appointment_date: string;
@@ -110,6 +118,7 @@ export type WhatsappOutboxStatus = 'pending' | 'sent' | 'failed';
 export type WhatsappOutboxType = 'confirmation' | 'reminder' | 'cancellation';
 
 export interface WhatsappOutboxRow {
+  [key: string]: unknown;
   id: string;
   appointment_id: string | null;
   phone: string;
@@ -120,10 +129,13 @@ export interface WhatsappOutboxRow {
   last_error: string | null;
   created_at: string;
   sent_at: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
   updated_at: string;
 }
 
 export interface WhatsappOutboxInsert {
+  [key: string]: unknown;
   appointment_id?: string | null;
   phone: string;
   message: string;
@@ -134,10 +146,22 @@ export interface WhatsappOutboxInsert {
 }
 
 export interface WhatsappOutboxUpdate {
+  [key: string]: unknown;
   status?: WhatsappOutboxStatus;
   attempts?: number;
   last_error?: string | null;
   sent_at?: string | null;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+}
+
+export interface WhatsappBlockedPhoneRow {
+  [key: string]: unknown;
+  phone_digits: string;
+  phone: string;
+  reason: string;
+  appointment_id: string | null;
+  created_at: string;
 }
 
 // ---------------------------------------------------------------------
@@ -152,32 +176,70 @@ export interface Database {
         Row: ProfileRow;
         Insert: Partial<ProfileRow> & Pick<ProfileRow, 'id'>;
         Update: Partial<ProfileRow>;
+        Relationships: [];
       };
       date_ranges: {
         Row: DateRangeRow;
         Insert: DateRangeInsert;
         Update: DateRangeUpdate;
+        Relationships: [];
       };
       appointments: {
         Row: AppointmentRow;
         Insert: AppointmentInsert;
         Update: AppointmentUpdate;
+        Relationships: [];
       };
       whatsapp_outbox: {
         Row: WhatsappOutboxRow;
         Insert: WhatsappOutboxInsert;
         Update: WhatsappOutboxUpdate;
+        Relationships: [];
+      };
+      whatsapp_blocked_phones: {
+        Row: WhatsappBlockedPhoneRow;
+        Insert: Omit<WhatsappBlockedPhoneRow, 'created_at'> & {
+          created_at?: string;
+        };
+        Update: Partial<Omit<WhatsappBlockedPhoneRow, 'phone_digits'>>;
+        Relationships: [];
       };
     };
     Views: {
       appointment_slots_public: {
         Row: AppointmentSlotPublicRow;
+        Relationships: [];
       };
     };
     Functions: {
       is_admin: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      get_appointment_by_cancel_token: {
+        Args: { p_token: string };
+        Returns: {
+          id: string;
+          date_range_id: string;
+          appointment_date: string;
+          appointment_time: string;
+          client_first_name: string;
+          status: AppointmentStatus;
+        }[];
+      };
+      cancel_appointment_by_token: {
+        Args: { p_token: string };
+        Returns: {
+          success: boolean;
+          message: string;
+          appointment_id: string | null;
+          date_range_id: string | null;
+          client_first_name: string | null;
+          client_last_name: string | null;
+          client_phone: string | null;
+          appointment_date: string | null;
+          appointment_time: string | null;
+        }[];
       };
     };
     Enums: {

@@ -199,3 +199,143 @@ export async function markCompleted(rangeId: string, appointmentId: string) {
     'Turno marcado como atendido.'
   );
 }
+
+export async function updateAppointmentClient(
+  rangeId: string,
+  appointmentId: string,
+  formData: FormData
+): Promise<void> {
+  const firstName = String(formData.get('client_first_name') ?? '').trim();
+  const lastName = String(formData.get('client_last_name') ?? '').trim();
+  const phone = String(formData.get('client_phone') ?? '').trim();
+  const phoneDigits = phone.replace(/\D/g, '');
+
+  if (!firstName || firstName.length > 80 || !lastName || lastName.length > 80) {
+    redirect(
+      `/admin/turnos/${rangeId}?error=${encodeURIComponent(
+        'El nombre y el apellido son obligatorios y deben tener hasta 80 caracteres.'
+      )}`
+    );
+  }
+
+  if (phoneDigits.length < 8 || phoneDigits.length > 15) {
+    redirect(
+      `/admin/turnos/${rangeId}?error=${encodeURIComponent(
+        'Ingresá un teléfono válido con código de país.'
+      )}`
+    );
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect('/login');
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError || profile?.role !== 'admin') redirect('/login');
+
+  const { data: previousAppointment, error: previousError } = await supabase
+    .from('appointments')
+    .select('client_phone')
+    .eq('id', appointmentId)
+    .eq('date_range_id', rangeId)
+    .maybeSingle();
+
+  if (previousError || !previousAppointment) {
+    redirect(
+      `/admin/turnos/${rangeId}?error=${encodeURIComponent(
+        'No se encontró el turno para actualizar.'
+      )}`
+    );
+  }
+
+  const { data: appointment, error } = await supabase
+    .from('appointments')
+    .update({
+      client_first_name: firstName,
+      client_last_name: lastName,
+      client_phone: phone,
+    })
+    .eq('id', appointmentId)
+    .eq('date_range_id', rangeId)
+    .select(
+      'id, status, client_first_name, client_last_name, client_phone, appointment_date, appointment_time, cancel_token'
+    )
+    .single();
+
+  if (error || !appointment) {
+    console.error('Error al corregir los datos del cliente:', error);
+    redirect(
+      `/admin/turnos/${rangeId}?error=${encodeURIComponent(
+        'No se pudieron guardar los datos del cliente.'
+      )}`
+    );
+  }
+
+  const previousPhoneDigits = previousAppointment.client_phone.replace(/\D/g, '');
+  const phoneChanged = previousPhoneDigits !== phoneDigits;
+  let notice = 'Datos del cliente actualizados.';
+
+  if (phoneChanged) {
+    const now = new Date().toISOString();
+
+    // Cierra notificaciones anteriores y frena cualquier mensaje todavía
+    // pendiente al número corregido. Los fallos siguen bloqueando el número
+    // anterior, pero dejan de aparecer como una incidencia sin resolver.
+    const { error: resolveError } = await supabase
+      .from('whatsapp_outbox')
+      .update({
+        resolved_at: now,
+        resolved_by: user.id,
+        status: 'failed',
+        updated_at: now,
+      })
+      .eq('appointment_id', appointmentId)
+      .eq('type', 'confirmation')
+      .eq('status', 'pending');
+
+    const { error: closeFailureError } = await supabase
+      .from('whatsapp_outbox')
+      .update({ resolved_at: now, resolved_by: user.id, updated_at: now })
+      .eq('appointment_id', appointmentId)
+      .eq('type', 'confirmation')
+      .eq('status', 'failed')
+      .is('resolved_at', null);
+
+    if (resolveError || closeFailureError) {
+      console.error('No se pudieron cerrar mensajes anteriores:', resolveError ?? closeFailureError);
+    }
+
+    if (
+      ['confirmed', 'in_progress', 'completed'].includes(appointment.status)
+    ) {
+      const sendResult = await sendOrQueueWhatsAppMessage({
+        appointmentId,
+        phone,
+        message: buildConfirmationMessage(appointment),
+        type: 'confirmation',
+      });
+
+      if (sendResult === 'blocked') {
+        notice =
+          'Datos guardados. No se envió el WhatsApp porque el número nuevo está deshabilitado por un fallo anterior.';
+      } else if (sendResult === 'error') {
+        notice =
+          'Datos guardados, pero no se pudo enviar ni poner en cola el WhatsApp. Revisá el estado del turno.';
+      }
+    }
+  }
+
+  revalidatePath(`/admin/turnos/${rangeId}`);
+  revalidatePath('/admin/turnos');
+  redirect(
+    `/admin/turnos/${rangeId}?success=${encodeURIComponent(notice)}`
+  );
+}

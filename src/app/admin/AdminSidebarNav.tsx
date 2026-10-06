@@ -14,11 +14,13 @@ const POLL_INTERVAL_MS = 25_000;
 type NotificationsResponse = {
   pendingCount: number;
   recentCancellationsCount: number;
+  failedConfirmationCount: number;
 };
 
 type Props = {
   initialPendingCount: number;
   initialRecentCancellationsCount: number;
+  initialFailedConfirmationCount: number;
 };
 
 /**
@@ -34,10 +36,14 @@ type Props = {
 export function AdminSidebarNav({
   initialPendingCount,
   initialRecentCancellationsCount,
+  initialFailedConfirmationCount,
 }: Props) {
   const [pendingCount, setPendingCount] = useState(initialPendingCount);
   const [recentCancellationsCount, setRecentCancellationsCount] = useState(
     initialRecentCancellationsCount
+  );
+  const [failedConfirmationCount, setFailedConfirmationCount] = useState(
+    initialFailedConfirmationCount
   );
 
   useEffect(() => {
@@ -56,6 +62,7 @@ export function AdminSidebarNav({
         if (!cancelled) {
           setPendingCount(data.pendingCount);
           setRecentCancellationsCount(data.recentCancellationsCount);
+          setFailedConfirmationCount(data.failedConfirmationCount);
         }
       } catch (error) {
         // Un polling de fondo que falla una vez no amerita mostrarle
@@ -93,6 +100,17 @@ export function AdminSidebarNav({
             : 'cancelaciones recientes'}{' '}
           (última hora)
         </div>
+      )}
+
+      {failedConfirmationCount > 0 && (
+        <Link
+          href="/admin/turnos"
+          role="alert"
+          className="mt-3 block rounded-md border border-[#E3B3B3] bg-[#FBEAEA] px-3 py-2 text-xs font-medium text-[#8C3B3B] hover:bg-[#F6DEDE]"
+        >
+          No se logró enviar la confirmación del turno
+          {failedConfirmationCount > 1 ? ` (${failedConfirmationCount})` : ''}
+        </Link>
       )}
 
       <nav className="mt-5 flex gap-1 overflow-x-auto md:mt-8 md:flex-1 md:flex-col md:gap-1.5 md:overflow-visible">

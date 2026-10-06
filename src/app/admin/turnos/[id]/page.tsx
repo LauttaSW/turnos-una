@@ -9,6 +9,7 @@ import {
   confirmAppointment,
   markCompleted,
   markInProgress,
+  updateAppointmentClient,
 } from './actions';
 
 const STATUS_BADGE: Record<
@@ -158,6 +159,52 @@ export default async function TurnosDelRangoPage({
                         “{appt.notes}”
                       </p>
                     )}
+                    <form
+                      action={updateAppointmentClient.bind(null, range.id, appt.id)}
+                      className="mt-4 grid gap-3 sm:grid-cols-3"
+                    >
+                      <label className="text-xs font-medium text-[#8A7D77]">
+                        Nombre
+                        <input
+                          name="client_first_name"
+                          type="text"
+                          required
+                          maxLength={80}
+                          defaultValue={appt.client_first_name}
+                          className="mt-1 block w-full rounded-md border border-[#E2D6CF] bg-white px-3 py-2 text-sm font-normal text-[#2B2320] focus:border-[#9B3B54] focus:outline-none"
+                        />
+                      </label>
+                      <label className="text-xs font-medium text-[#8A7D77]">
+                        Apellido
+                        <input
+                          name="client_last_name"
+                          type="text"
+                          required
+                          maxLength={80}
+                          defaultValue={appt.client_last_name}
+                          className="mt-1 block w-full rounded-md border border-[#E2D6CF] bg-white px-3 py-2 text-sm font-normal text-[#2B2320] focus:border-[#9B3B54] focus:outline-none"
+                        />
+                      </label>
+                      <label className="text-xs font-medium text-[#8A7D77]">
+                        Teléfono
+                        <input
+                          name="client_phone"
+                          type="tel"
+                          required
+                          maxLength={24}
+                          defaultValue={appt.client_phone}
+                          className="mt-1 block w-full rounded-md border border-[#E2D6CF] bg-white px-3 py-2 text-sm font-normal text-[#2B2320] focus:border-[#9B3B54] focus:outline-none"
+                        />
+                      </label>
+                      <div className="sm:col-span-3">
+                        <button
+                          type="submit"
+                          className="rounded-md border border-[#E2D6CF] bg-white px-3 py-1.5 text-xs font-medium text-[#7A2E43] transition hover:border-[#9B3B54]/50 hover:bg-[#F3E4E8]"
+                        >
+                          Guardar datos del cliente
+                        </button>
+                      </div>
+                    </form>
                   </div>
 
                   {canCancel && (
