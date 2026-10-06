@@ -1,5 +1,5 @@
 import { fontDisplay, fontSans } from '@/lib/fonts';
-import { login } from './actions';
+import { LoginForm } from './LoginForm';
 
 export default async function LoginPage({
   searchParams,
@@ -46,60 +46,9 @@ export default async function LoginPage({
           </p>
 
           {error && (
-            <p
-              role="alert"
-              className="mt-6 rounded-md border border-[#E3B3B3] bg-[#FBEAEA] px-4 py-3 text-sm text-[#8C3B3B]"
-            >
-              {error}
-            </p>
+            <p role="alert" className="mt-6 rounded-md border border-[#E3B3B3] bg-[#FBEAEA] px-4 py-3 text-sm text-[#8C3B3B]">{error}</p>
           )}
-
-          <form action={login} className="mt-8 space-y-5">
-            <input type="hidden" name="redirectTo" value={redirectTo ?? ''} />
-
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-[#2B2320]"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                placeholder="vos@ejemplo.com"
-                className="mt-1.5 w-full rounded-md border border-[#E2D6CF] bg-white px-3.5 py-2.5 text-sm text-[#2B2320] outline-none transition focus:border-[#9B3B54] focus:ring-2 focus:ring-[#9B3B54]/20"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-[#2B2320]"
-              >
-                Contraseña
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                placeholder="••••••••"
-                className="mt-1.5 w-full rounded-md border border-[#E2D6CF] bg-white px-3.5 py-2.5 text-sm text-[#2B2320] outline-none transition focus:border-[#9B3B54] focus:ring-2 focus:ring-[#9B3B54]/20"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full rounded-md bg-[#9B3B54] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#7A2E43] focus:outline-none focus:ring-2 focus:ring-[#9B3B54]/40 focus:ring-offset-2"
-            >
-              Entrar
-            </button>
-          </form>
+          <LoginForm redirectTo={redirectTo ?? ''} />
         </div>
       </div>
     </main>

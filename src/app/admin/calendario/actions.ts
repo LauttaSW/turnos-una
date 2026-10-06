@@ -97,3 +97,43 @@ export async function listDateRanges(): Promise<DateRangeRow[]> {
 
   return data ?? [];
 }
+
+export async function deleteDateRange(formData: FormData): Promise<void> {
+  const rangeId = formData.get('rangeId');
+  if (typeof rangeId !== 'string' || !rangeId.trim()) {
+    fail('No se indicó un rango válido');
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect('/login');
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError || profile?.role !== 'admin') redirect('/login');
+
+  const { error } = await supabase
+    .from('date_ranges')
+    .delete()
+    .eq('id', rangeId);
+
+  if (error) {
+    console.error('Error al eliminar date_range:', error);
+    fail(
+      error.code === '23503'
+        ? 'No se pudo eliminar: hay turnos asociados y la base no permite borrarlos en cascada.'
+        : 'No se pudo eliminar el rango. Probá de nuevo.'
+    );
+  }
+
+  revalidatePath('/admin/calendario');
+  revalidatePath('/admin/turnos');
+  redirect('/admin/calendario?success=Se%20elimin%C3%B3%20el%20rango');
+}

@@ -1,17 +1,14 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 
-export async function login(formData: FormData) {
+export async function login(formData: FormData): Promise<{ error?: string; destination?: string }> {
   const email = (formData.get('email') as string | null)?.trim();
   const password = formData.get('password') as string | null;
   const redirectTo = formData.get('redirectTo') as string | null;
 
   if (!email || !password) {
-    redirect(
-      `/login?error=${encodeURIComponent('Completá email y contraseña')}`
-    );
+    return { error: 'Completá email y contraseña' };
   }
 
   const supabase = await createClient();
@@ -22,9 +19,7 @@ export async function login(formData: FormData) {
   });
 
   if (error || !data.user) {
-    redirect(
-      `/login?error=${encodeURIComponent('Email o contraseña incorrectos')}`
-    );
+    return { error: 'Email o contraseña incorrectos' };
   }
 
   const { data: profile } = await supabase
@@ -35,15 +30,9 @@ export async function login(formData: FormData) {
 
   if (profile?.role !== 'admin') {
     await supabase.auth.signOut();
-    redirect(
-      `/login?error=${encodeURIComponent(
-        'Esta cuenta no tiene permisos de administrador'
-      )}`
-    );
+    return { error: 'Esta cuenta no tiene permisos de administrador' };
   }
 
-  const destination =
-    redirectTo && redirectTo.startsWith('/admin') ? redirectTo : '/admin';
-
-  redirect(destination);
+  const destination = redirectTo?.startsWith('/admin') ? redirectTo : '/admin/turnos';
+  return { destination };
 }

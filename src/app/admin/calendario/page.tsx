@@ -8,6 +8,7 @@ import {
 } from '@/lib/dates';
 import { createDateRange, listDateRanges } from './actions';
 import { CopyLinkButton } from './CopyLinkButton';
+import { DeleteDateRangeButton } from './DeleteDateRangeButton';
 
 const STATUS_BADGE: Record<
   DateRangeStatus,
@@ -186,7 +187,10 @@ export default async function CalendarioPage({
                       </p>
                     </div>
 
-                    <CopyLinkButton url={publicUrl} />
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      <CopyLinkButton url={publicUrl} />
+                      <DeleteDateRangeButton rangeId={range.id} title={range.title} />
+                    </div>
                   </div>
                 </li>
               );
