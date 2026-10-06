@@ -175,7 +175,7 @@ export default async function AdminMobileHomePage() {
         </div>
         {failedMessageLookupUnavailable && (
           <p className="mb-3 rounded-xl border border-[#E7D7A8] bg-[#FFF8E5] px-4 py-3 text-sm text-[#765D1B]">
-            No se pudieron consultar los avisos de WhatsApp. Revisá la clave secreta de Supabase en el servidor.
+            No se pudo consultar la cola de WhatsApp. Revisá las variables de Supabase y los logs del servidor para ver el motivo.
           </p>
         )}
         {retryableFailedMessages.length > 0 || pendingAppointments.length > 0 ? (

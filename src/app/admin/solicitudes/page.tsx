@@ -39,10 +39,21 @@ export default async function AdminRequestsPage() {
       .order('created_at', { ascending: false })
       .limit(100);
 
-    if (error) failedMessageLookupUnavailable = true;
-    else failedMessages = data ?? [];
-  } catch {
+    if (error) {
+      failedMessageLookupUnavailable = true;
+      console.warn('No se pudieron consultar los mensajes fallidos:', {
+        code: error.code,
+        message: error.message,
+      });
+    } else {
+      failedMessages = data ?? [];
+    }
+  } catch (error) {
     failedMessageLookupUnavailable = true;
+    console.warn(
+      'No se pudo inicializar la cola de WhatsApp:',
+      error instanceof Error ? error.message : error
+    );
   }
 
   const appointmentIds = [...new Set([
@@ -74,7 +85,7 @@ export default async function AdminRequestsPage() {
 
       {failedMessageLookupUnavailable && (
         <p className="mt-6 rounded-lg border border-[#E7D7A8] bg-[#FFF8E5] px-4 py-3 text-sm text-[#765D1B]">
-          No se pudieron consultar los avisos de WhatsApp. Revisá la clave secreta de Supabase en el servidor.
+          No se pudo consultar la cola de WhatsApp. Revisá las variables de Supabase y los logs del servidor para ver el motivo.
         </p>
       )}
 
