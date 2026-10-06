@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 
 /**
  * Cantidad total de turnos en estado 'pending', en todos los
@@ -50,24 +51,36 @@ export async function getRecentCancellationsCount(
 }
 
 export async function getFailedWhatsAppMessageCount(): Promise<number> {
-  const supabase = await createClient();
+  try {
+    // Usamos el mismo cliente privilegiado que consulta las solicitudes.
+    // Si falta la clave en producción, no mostrar un contador de fallos que
+    // el administrador no puede abrir; la vista de solicitudes informa
+    // que la cola no está disponible.
+    const supabase = createServiceClient();
+    const { count, error } = await supabase
+      .from('whatsapp_outbox')
+      .select('id', { count: 'exact', head: true })
+      .in('type', ['confirmation', 'cancellation'])
+      .eq('status', 'failed')
+      .is('resolved_at', null)
+      .not('appointment_id', 'is', null);
 
-  const { count, error } = await supabase
-    .from('whatsapp_outbox')
-    .select('id', { count: 'exact', head: true })
-    .in('type', ['confirmation', 'cancellation'])
-    .eq('status', 'failed')
-    .is('resolved_at', null);
+    if (error) {
+      console.error('Error al contar mensajes de WhatsApp fallidos:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      return 0;
+    }
 
-  if (error) {
-    console.error('Error al contar mensajes de WhatsApp fallidos:', {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-    });
+    return count ?? 0;
+  } catch (error) {
+    console.warn(
+      'No se pudieron contar mensajes de WhatsApp fallidos:',
+      error instanceof Error ? error.message : error
+    );
     return 0;
   }
-
-  return count ?? 0;
 }
